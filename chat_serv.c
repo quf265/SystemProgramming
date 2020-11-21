@@ -72,24 +72,24 @@ int main(int argc, char *argv[])
     char buf_temp[BUF_SIZE];
     int room_check = 0;
     char message_type[10];
-    /*
+    
 	if(argc != 2)
 	{
 		printf("Usage : %s <PORT> \n",argv[0]);
 		exit(1);
-	}*/
+	}
     //포트임의로 넣기위해서
 
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
     //소켓을 생성한다. PF_INET은 IPv4을 의미
-    //SOCK_STREAM은 TCP를 의미한다.
+    //SOCK_STREAM은 TCP를 의미한다./*
     //0은 옵션으로 무시해도 됨
     if (serv_sock == -1)
         error_handling("socket() error");
     memset(&serv_adr, 0, sizeof(serv_adr));
     serv_adr.sin_family = AF_INET;
     serv_adr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_adr.sin_port = htons(atoi("9000"));
+    serv_adr.sin_port = htons(atoi(argv[1]));
     //서버쪽 주소를 채우는 과정이다.
 
     if (bind(serv_sock, (struct sockaddr *)&serv_adr, sizeof(serv_adr)) == -1)
