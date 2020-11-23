@@ -14,7 +14,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/select.h>
-//TEST
+
 #define BUF_SIZE 100
 #define MAX_MEMBER 100
 #define MAX_NAME_SIZE 20
@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
                             strcpy(buf.message, "******< ");
                             strcat(buf.message, member_list[i].name);
                             strcat(buf.message, " > 님이 나가셨습니다.******");
-                            for (int j = 0; j < fd_max; j++)
+                            for (int j = 0; j < fd_max + 1; j++)
                             {
                                 if (member_list[j].room == room)
                                 {
