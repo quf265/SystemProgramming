@@ -43,7 +43,6 @@ typedef struct
 member member_list[MAX_MEMBER];
 //사용자를 담는 코드
 int member_num;
-//write만들기
 void new_member(int num);
 void send_message(member buf, char type, int dest);
 int alreay_print_room(int *room_list, int room_num, int fill_num);
@@ -59,8 +58,6 @@ int main(int argc, char *argv[])
     fd_set reads, cpy_reads;
     //이건 현재 연결되어 있는 사용자를 비트로 표현하는 것이다. (1이면 연결 0 이면 비었음)
     //multiplexing을 위한 변수들이다.
-    //TEST wdawfionawifnoaiegnoiafmajne Please delete this one using git
-    //And this one
     socklen_t adr_sz;
     //주소 크기
     int fd_max, str_len, fd_num, i;
