@@ -14,7 +14,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/select.h>
-
+//TEST
 #define BUF_SIZE 100
 #define MAX_MEMBER 100
 #define MAX_NAME_SIZE 20
