@@ -43,7 +43,7 @@ typedef struct
 member member_list[MAX_MEMBER];
 //사용자를 담는 코드
 int member_num;
-
+//write만들기
 void new_member(int num);
 void send_message(member buf, char type, int dest);
 int alreay_print_room(int *room_list, int room_num, int fill_num);
