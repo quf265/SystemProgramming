@@ -9,4 +9,6 @@ int main(void){
 	printf("정재희\n");
 	// José
 	printf("José.\n");
+	//현석
+	printf("신현석\n");
 }
