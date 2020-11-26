@@ -11,4 +11,5 @@ int main(void){
 	printf("José.\n");
 	//현석
 	printf("신현석\n");
+	//GitHub DeskTop 사용법
 }
