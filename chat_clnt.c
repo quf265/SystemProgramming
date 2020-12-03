@@ -72,7 +72,7 @@ int read_buf(int sock){
 		return -1;
 	}
 	while(full_len < sizeof(member)){
-		str_len = read(sock,(char*)&buf,sizeof(member));
+		str_len = read(sock,(char*)(&buf+str_len),sizeof(member));
 		full_len += str_len;
 	}
 	//printf("나온다.");
