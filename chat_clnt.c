@@ -11,6 +11,9 @@
 #define USER_MESSAGE '2'
 #define MAX_NAME_SIZE 20
 
+typedef enum{police,mafia,docter,soldier}jobs;
+typedef enum{dead,alive}life;
+typedef enum{use,unuse}capacity;
 
 typedef struct{
     int valid;
@@ -19,6 +22,10 @@ typedef struct{
     char type;
     char name[MAX_NAME_SIZE];
     char message[BUF_SIZE];
+	jobs job;   
+    life live;
+    capacity skill;  //능력을 썼는지 유무
+	
 }member;
 
 void error_handling();
