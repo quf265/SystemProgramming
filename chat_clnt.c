@@ -15,18 +15,23 @@ typedef enum{police,mafia,docter,soldier}jobs;
 typedef enum{dead,alive}life;
 typedef enum{use,unuse}capacity;
 
-typedef struct{
-    int valid;
+typedef struct
+{
+    int valid;      //접속해있는 사람인지 아닌지 결정하는 변수
     int first;      //처음입장했는지 아닌지 묻는 함수
     int room;
+    int whisper;        //귓속말 대상을 정하는 함수
     char type;
     char name[MAX_NAME_SIZE];
     char message[BUF_SIZE];
-	jobs job;   
+    //마피아게임을 위한 변수
+    char play;      //마피아게임중인지 확인
+    jobs job;   
     life live;
     capacity skill;  //능력을 썼는지 유무
-	
-}member;
+
+} member;
+//사용자 변수
 
 void error_handling();
 void read_routine(int sock);

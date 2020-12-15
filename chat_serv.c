@@ -422,7 +422,7 @@ int start_mafia(int i, int fd_max){     //이미 게임중인지 확인했고 �
     struct arg * args = (struct arg *)malloc(sizeof(struct arg));
     args->room_number = room_pos;
     args->mem_number = *mem_number;
-    free(*mem_number);
+    free(mem_number);
     if(pthread_create(mafia_thread, NULL, mafia_game , args)!=0){       //create_pthread error
         error_message("쓰레드 생성 실패");
         return -1;
