@@ -634,6 +634,7 @@ int start_mafia(int i, int *fd_max, fd_set *reads)
     }
     struct arg *args = (struct arg *)malloc(sizeof(struct arg));
     args->room_number = room_pos;
+<<<<<<< HEAD
     args->mem_number = mem_number;
     args->fd_max = *fd_max;
 
@@ -641,6 +642,13 @@ int start_mafia(int i, int *fd_max, fd_set *reads)
     for (int j = 0; j < mem_number; j++)
     {
         printf("%s\n", member_list[temp_member[j]].name);
+=======
+    args->mem_number = *mem_number;
+    free(mem_number);
+    if(pthread_create(mafia_thread, NULL, mafia_game , args)!=0){       //create_pthread error
+        error_message("쓰레드 생성 실패");
+        return -1;
+>>>>>>> 034cbd9379e621193d237df73bee82e4c8a7df83
     }
     room_mafia[room_pos].room_number = member_list[i].room; //어느방에서 하고 있는지 가르쳐준다.
     if (pipe(room_mafia[room_pos].to_main_pipe) != 0)

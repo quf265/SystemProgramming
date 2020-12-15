@@ -15,7 +15,12 @@ typedef enum{police,mafia,docter,soldier}jobs;
 typedef enum{dead,alive}life;
 typedef enum{use,unuse}capacity;
 
+<<<<<<< HEAD
 typedef struct{
+=======
+typedef struct
+{
+>>>>>>> 034cbd9379e621193d237df73bee82e4c8a7df83
     int valid;      //접속해있는 사람인지 아닌지 결정하는 변수
     int first;      //처음입장했는지 아닌지 묻는 함수
     int room;
@@ -30,8 +35,9 @@ typedef struct{
     jobs job;   
     life live;
     capacity skill;  //능력을 썼는지 유무
-	
-}member;
+
+} member;
+//사용자 변수
 
 void error_handling();
 void read_routine(int sock);
