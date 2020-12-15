@@ -16,13 +16,18 @@ typedef enum{dead,alive}life;
 typedef enum{use,unuse}capacity;
 
 typedef struct{
-    int valid;
+    int valid;      //접속해있는 사람인지 아닌지 결정하는 변수
     int first;      //처음입장했는지 아닌지 묻는 함수
     int room;
+    int whisper;        //귓속말 대상을 정하는 함수
     char type;
+    int mafia_num;
+    int citizen_num;
     char name[MAX_NAME_SIZE];
     char message[BUF_SIZE];
-	jobs job;   
+    //마피아게임을 위한 변수
+    char play;      //마피아게임중인지 확인
+    jobs job;   
     life live;
     capacity skill;  //능력을 썼는지 유무
 	
@@ -79,6 +84,7 @@ int read_buf(int sock){
 		return -1;
 	}
 	while(full_len < sizeof(member)){
+		printf("받은 바이트 수 : <%d>\n",str_len);
 		str_len = read(sock,(char*)(&buf+str_len),sizeof(member));
 		full_len += str_len;
 	}
