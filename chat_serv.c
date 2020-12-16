@@ -80,6 +80,7 @@ typedef enum
 typedef enum
 {
     noon,
+    vote,
     night
 } today;
 
@@ -99,7 +100,8 @@ typedef struct
     jobs job;
     life live;
     capacity skill; //능력을 썼는지 유무
-
+    char vote_num;   //투표를 얼만큼 받았는지 설정
+    char skill_traget; //스킬을 누구에게 쓸건지 정하는 함수
 } member;
 //사용자 변수
 
@@ -153,10 +155,12 @@ int start_mafia(int i, int * fd_max, fd_set * reads); //마피아 게임을 시�
 void *mafia_game(void * args);              //마피아게임 thread다
 int initial_game(int mem_number, int room_pos);            //직업을 설정해준다.
 int mafia_number(int room_pos, int * mafia_num, int * live_num);   //마피아가 몇명 살아있는지 반환하는 함수
-void mafia_chat(int i, int fd_max);
-void change_day(int i, member buf, fd_set * reads);
-void mafia_send_message(member buf, char type, int room_pos);
-void end_mafia_game(int i, int room_pos, fd_set * reads);
+void mafia_send_message(member buf, char type, int room_pos);           //마피아 방에 있는 사람들에게 메세지를 보내는 함수
+void end_mafia_game(int i, int room_pos, fd_set * reads);   //마피아 게임을 종료하고 자원을 반환하는 함수
+void mafia_chat(int i, int fd_max, member buf , fd_set * reads);    //마피아게임을 하는 사람들끼리 쓰는 채팅
+void change_day(int i, member buf, fd_set * reads);     //마피아방의 현재 시간정보를 바꾸고 그에따라서 결산하는 함수
+void result_vote(int room_pos);     //투표결과
+void result_night(int room_pos);        //밤의 결과
 
 void display_job(int mem_num, int room_pos)
 {
@@ -290,24 +294,36 @@ int main(int argc, char *argv[])
                     {
                         //*************************************************************************************************************************
                         //초기에 방설정과 이름을 정하는 함수 시작
-                        if (buf.play == TRUE)
+                        if (member_list[i].valid == FALSE)      //파이프로 부터 온 신호
                         {
-                            change_day(i, buf, &reads);
-                            buf.play = FALSE;
+                            if (buf.play == TRUE)
+                            {
+                                change_day(i, buf, &reads);
+                                buf.play = FALSE;
+                            }
                         }
-                        else if (member_list[i].first == EMPTY)
+                        else                //유저로 부터 온 신호
                         {
-                            first_enter(buf, i, fd_max);
-                        }
-                        else if (member_list[i].room == EMPTY)
-                        {
-                            first_room(buf, i, fd_max);
-                        }
-                        //*************************************************************************************************************************
-                        //초기에 방설정과 이름을 정하는 함수끝
-                        else
-                        {
-                            message_task(buf, i, &fd_max, &reads);
+                            if(member_list[i].play == TRUE){    //마피아 게임하는 사람들의 채팅
+                                mafia_chat(i, fd_max , buf, &reads);
+                            }
+                            else        //마피아 게임 외의 채팅
+                            {
+                                if (member_list[i].first == EMPTY)
+                                {
+                                    first_enter(buf, i, fd_max);
+                                }
+                                else if (member_list[i].room == EMPTY)
+                                {
+                                    first_room(buf, i, fd_max);
+                                }
+                                //*************************************************************************************************************************
+                                //초기에 방설정과 이름을 정하는 함수끝
+                                else
+                                {
+                                    message_task(buf, i, &fd_max, &reads);
+                                }
+                            }
                         }
                     }
                 } //else 괄호
@@ -320,18 +336,50 @@ int main(int argc, char *argv[])
 /**************************************** 마피아 코드 *******************************************************/
 //마피아 게임
 
-void mafia_chat(int i, int fd_max)
+void mafia_chat(int i, int fd_max, member buf , fd_set * reads)
 { //일단 만들어 놓음 이건 마피아게임일 하는 방이면 이 채팅기법으로 넘어온다.
+    int room_pos = -1;  //room_pos는 마피아게임을 할 때 
+    for(int j ; j < room_max ; j++){
+            if(room_mafia[j].room_number == member_list[i].room){
+                room_pos = j;   //사용자들의 마피아게임방이 어딘지 위치를 얻어낸다.(get room information playing mafiagame)
+            }
+    }
+    if(room_pos == -1){
+        //디버깅용
+        strcpy(buf.message,"소속된 방이 존재하지 않습니다.\n");
+        send_message(buf,SYSTEM_MESSAGE,i);
+        return;
+    }
+    if(room_mafia[room_pos].day == noon){       //현석
+        //현석
+    }
+    else if(room_mafia[room_pos].day == vote){   //투표시
+        //jose
+    }
+    else if(room_mafia[room_pos].day == night){  //밤에 능력을 쓸 시
+        //재희
+    }
+    else{           //발생할 수 없는 에러지만 에러처리함
+        error_message("에러가 발생했습니다.");
+        end_mafia_game( room_mafia[room_pos].to_main_pipe[0], room_pos, reads);
+    }
 }
 
-void change_day(int i, member buf, fd_set * reads)
-{
+void result_vote(int room_pos){     //투표결과에 따라 멤버를 죽은지 살은지를 설정하는 함수
+    //Jose
+}
+void result_night(int room_pos){        //능력에 따라서 화면에 출력하고 죽일지 살릴지 설정하는 함수
+    //재희
+}
+
+void change_day(int i, member buf, fd_set * reads)    
+{   // i는 메인에게 날짜를 바꾸라고 보낸 child 프로세스입니다.
     //int j;
     int mafia_num = 0;
     int citizen_num = 0;
     int room_pos = buf.room;
 
-    mafia_number(buf.room, &room_mafia[room_pos].mafia_number, &room_mafia[room_pos].citizen_number);
+    
     //디버깅용
     /*
     mafia_num = room_mafia[room_pos].mafia_number;
@@ -351,31 +399,41 @@ void change_day(int i, member buf, fd_set * reads)
     if (!strcmp(buf.message, "noon"))
     { //낮으로 바꾸어라
         room_mafia[room_pos].day = noon;
-        buf.mafia_num = room_mafia[room_pos].mafia_number;
-        buf.citizen_num = room_mafia[room_pos].citizen_number;
-        //send_message(buf,SYSTEM_MESSAGE,i);             //i로 보내면 안됨.
         //디버깅용
         printf("--------change day2----");
-        /*
-        printf("to_child_pipe[1] : <%d>\n",room_mafia[room_pos].to_child_pipe[1]);
-        printf("from_cilhd_pipe[0] : <%d>\n",room_mafia[room_pos].to_main_pipe[0]);
-        */
+        result_night(room_pos);
+        mafia_number(buf.room, &room_mafia[room_pos].mafia_number, &room_mafia[room_pos].citizen_number);
+        buf.mafia_num = room_mafia[room_pos].mafia_number;
+        buf.citizen_num = room_mafia[room_pos].citizen_number;
         send_message(buf, SYSTEM_MESSAGE, room_mafia[room_pos].to_child_pipe[1]); //보내는건 1번으로
         strcpy(buf.message,"낮이 되었습니다.");
         mafia_send_message(buf,SYSTEM_MESSAGE,room_pos);
         //printf("낮으로 바뀌었습니다.\n");
     }
-    else if (!strcmp(buf.message, "night"))
-    { //밤으로 바꾸어라
-        room_mafia[room_pos].day = night;
-        buf.mafia_num = room_mafia[room_pos].mafia_number;
-        buf.citizen_num = room_mafia[room_pos].citizen_number;
-        //send_message(buf,SYSTEM_MESSAGE,i);
-        printf("--------change day3----");
+    else if(!strcmp(buf.message,"vote")){       //투표모드로 바뀌는 코드
+        room_mafia[room_pos].day = vote;
+        
         /*
         printf("to_child_pipe[1] : <%d>\n",room_mafia[room_pos].to_child_pipe[1]);
         printf("from_cilhd_pipe[0] : <%d>\n",room_mafia[room_pos].to_main_pipe[0]);
         */
+        mafia_number(buf.room, &room_mafia[room_pos].mafia_number, &room_mafia[room_pos].citizen_number);
+        buf.mafia_num = room_mafia[room_pos].mafia_number;
+        buf.citizen_num = room_mafia[room_pos].citizen_number;
+        send_message(buf, SYSTEM_MESSAGE, room_mafia[room_pos].to_child_pipe[1]); //보내는건 1번으로
+        strcpy(buf.message,"투표를 시작합니다.");
+        mafia_send_message(buf,SYSTEM_MESSAGE,room_pos);
+    }
+    else if (!strcmp(buf.message, "night"))
+    { //밤으로 바꾸어라
+        room_mafia[room_pos].day = night;
+        //send_message(buf,SYSTEM_MESSAGE,i);
+        //printf("--------change day3----");
+        result_vote(room_pos);
+
+        mafia_number(buf.room, &room_mafia[room_pos].mafia_number, &room_mafia[room_pos].citizen_number);
+        buf.mafia_num = room_mafia[room_pos].mafia_number;
+        buf.citizen_num = room_mafia[room_pos].citizen_number;
         send_message(buf, SYSTEM_MESSAGE, room_mafia[room_pos].to_child_pipe[1]); //보내는건 1번으로
         strcpy(buf.message,"밤이 되었습니다.");
         mafia_send_message(buf,SYSTEM_MESSAGE,room_pos);
@@ -421,8 +479,8 @@ int mafia_number(int room_pos, int *mafia_num, int *live_num)
     *live_num = 0;
     for (int i = 0; i < mem_number; i++)
     {
-        if (member_list[room_mafia[room_pos].member_list[i]].valid == TRUE)
-        {
+        if (member_list[room_mafia[room_pos].member_list[i]].valid == TRUE && member_list[room_mafia[room_pos].member_list[i]].live == TRUE )     //나갔는지 확인
+        {       //안나갔고 살아있을때만 인원으로 세야한다.
             if (member_list[room_mafia[room_pos].member_list[i]].job == mafia)
             {
                 (*mafia_num)++;
@@ -443,7 +501,7 @@ void *mafia_game(void *args)
     int to_parent = room_mafia[room_pos].to_main_pipe[1];
     int from_parent = room_mafia[room_pos].to_child_pipe[0];
 
-    display_job(live_number, room_pos); //디버깅용
+    //display_job(live_number, room_pos); //디버깅용  직업 분배해줌
 
     for (int i = 3; i < fd_max + 1; i++)
     { //소켓은 3번부터
@@ -479,10 +537,14 @@ void *mafia_game(void *args)
         signal(SIGALRM, SIG_IGN);
         alarm(5);
         sleep(5);
-        if (day == night)
+        if (day == night)       //바뀌는 순서는 밤 -> 낮 -> 투표 -> 밤 //change order night-> noon-> vote -> night
         { //밤-> 낮
             strcpy(buf.message, "noon");
             day = noon;
+        }
+        else if(day == noon){
+            strcpy(buf.message,"vote");
+            day = vote;
         }
         else
         { //낮->밤
@@ -634,7 +696,6 @@ int start_mafia(int i, int *fd_max, fd_set *reads)
     }
     struct arg *args = (struct arg *)malloc(sizeof(struct arg));
     args->room_number = room_pos;
-<<<<<<< HEAD
     args->mem_number = mem_number;
     args->fd_max = *fd_max;
 
@@ -642,13 +703,6 @@ int start_mafia(int i, int *fd_max, fd_set *reads)
     for (int j = 0; j < mem_number; j++)
     {
         printf("%s\n", member_list[temp_member[j]].name);
-=======
-    args->mem_number = *mem_number;
-    free(mem_number);
-    if(pthread_create(mafia_thread, NULL, mafia_game , args)!=0){       //create_pthread error
-        error_message("쓰레드 생성 실패");
-        return -1;
->>>>>>> 034cbd9379e621193d237df73bee82e4c8a7df83
     }
     room_mafia[room_pos].room_number = member_list[i].room; //어느방에서 하고 있는지 가르쳐준다.
     if (pipe(room_mafia[room_pos].to_main_pipe) != 0)
