@@ -366,7 +366,26 @@ void mafia_chat(int i, int fd_max, member buf , fd_set * reads)
 }
 
 void result_vote(int room_pos){     //투표결과에 따라 멤버를 죽은지 살은지를 설정하는 함수
-    //Jose
+    int vote_number = 0;
+    int most_voted_index = -1;
+    int most_votes = 0;
+    int draw = 0;
+
+    for(int i = 0; i < room_mafia[room_pos].mem_number; i++){
+        if ( member_list[room_mafia[room_pos].member_list[i]].valid == TRUE && member_list[room_mafia[room_pos].member_list[i]].live == TRUE ) // checks every connected and alive player
+            if(member_list[room_mafia[room_pos].member_list[i]].vote_num > most_votes){
+                most_votes = member_list[room_mafia[room_pos].member_list[i]].vote_num
+                most_voted_index = i; // keeps the index of the player with most votes
+                draw = 0; // cleans draw condition when new player with most votes is found
+            }
+            if(member_list[room_mafia[room_pos].member_list[i]].vote_num == most_votes)
+                draw = 1; // draw condition
+    }
+    
+    if(!draw)
+        member_list[room_mafia[room_pos].member_list[most_voted_index]].live = dead; // with the index of the sacrificed player is easy to print out who died.
+    else
+        printf("Unreachable conclusion.. game proceeds");  // Maybe send this message to players after
 }
 void result_night(int room_pos){        //능력에 따라서 화면에 출력하고 죽일지 살릴지 설정하는 함수
     //재희

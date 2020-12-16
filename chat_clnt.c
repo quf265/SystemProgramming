@@ -4,6 +4,7 @@
 #include<unistd.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
+// #include <termios.h> why not include here? 
 
 #define BUF_SIZE 100
 #define FREE_MESSAGE '0'
@@ -15,12 +16,8 @@ typedef enum{police,mafia,docter,soldier}jobs;
 typedef enum{dead,alive}life;
 typedef enum{use,unuse}capacity;
 
-<<<<<<< HEAD
-typedef struct{
-=======
 typedef struct
 {
->>>>>>> 034cbd9379e621193d237df73bee82e4c8a7df83
     int valid;      //접속해있는 사람인지 아닌지 결정하는 변수
     int first;      //처음입장했는지 아닌지 묻는 함수
     int room;
@@ -78,7 +75,7 @@ int main(int argc, char * argv[])
 		//부모는 읽기를 담당
 	close(sock);
 	return 0 ;
-	#include<termios.h>
+	#include<termios.h> // but here after return? 
 }
 //아래코드는 서버로 부터 데이터를 받아서 buf에 넣는 코드입니다.
 int read_buf(int sock){
