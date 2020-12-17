@@ -397,7 +397,31 @@ void mafia_chat(int i, int fd_max, member buf , fd_set * reads)
         //jose
     }
     else if(room_mafia[room_pos].day == night){  //밤에 능력을 쓸 시
-        //재희
+        // citizen은 채팅을 못하도록 차단
+        if (buf.job == citizen && buf.room == room_pos) {
+            strcpy(buf.message, "/b ");
+            strcat(buf.message, buf.name);
+            buf.type = SYSTEM_MESSAGE;
+            message_task(buf, i, &fd_max, reads);
+        }
+        else {
+            char* ptr;
+            strcpy(skill_target_name, buf.message);
+            if (strlen(ptr) >= MAX_NAME_SIZE) {
+                strcpy(buf.message, "이름은 20글자까지입니다.");
+                send_message(buf, SYSTEM_MESSAGE, i);
+            }
+            if (buf.job != soldier) {
+                for (int j = 0; j < room_mafia[room_pos].mem_number; j++) {
+                    if (!strcmp(member_list[room_mafia[room_pos].member_list[j]].name, skill_target_name)) {
+                        buf.skill_target = j;
+                    }
+                }
+                buf.skill = use;
+            }
+            result_night(room_pos);
+            //message_task(buf, i, &fd_max, reads);
+        }
     }
     else{           //발생할 수 없는 에러지만 에러처리함
         error_message("에러가 발생했습니다.");
@@ -428,7 +452,49 @@ void result_vote(int room_pos){     //투표결과에 따라 멤버를 죽은지
         printf("Unreachable conclusion.. game proceeds");  // Maybe send this message to players after
 }
 void result_night(int room_pos){        //능력에 따라서 화면에 출력하고 죽일지 살릴지 설정하는 함수
-    //재희
+    if (member_list[m_tar].job != soldier) {
+        member_list[m_tar].live = FALSE;
+    }
+    else {
+        member_list[m_tar].skill = use;
+        member_list[d_tar].live = TRUE; //의사는 능력을 써서 타겟을 치료
+
+        //마피아, 경찰 능력 사용
+        for (int i = 0; i < room_mafia[room_pos].mem_number; i++) {
+            int job = member_list[room_mafia[room_pos].member_list[i]].job; // 스킬 사용자의 직업
+            int target = member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].job // 타겟의 직업
+                if (job == mafia) { // 마피아가 타겟을 암살
+                    member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].live = FALSE;
+                }
+            //경찰은 능력을 써서 지목한 타겟이 마피아인지 아닌지 여부를 알릴 수 있음
+                else if (job == police) {
+                    if (member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].job == mafia) {
+                        strcpy(buf.message, member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].name);
+                        strcat(buf.message, "님은 마피아였습니다.");
+                        mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
+                    }
+                    else {
+                        strcpy(buf.message, member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].name);
+                        strcat(buf.message, "님은 마피아가 아닙니다.");
+                        mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
+                    }
+                }
+        }
+        //의사는 능력을 써서 타겟을 치료
+        for (int i = 0; i < room_mafia[room_pos].mem_number; i++) {
+            int job = member_list[room_mafia[room_pos].member_list[i]].job;
+            if (job == doctor) {
+                member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].live = TRUE;
+            }
+        }
+        // 타겟이 군인일 경우 군인은 능력을 써서 1번 살아남을 수 있음
+        for (int i = 0; i < room_mafia[room_pos].mem_number; i++) {
+            int job = member_list[room_mafia[room_pos].member_list[i]].job;
+            if (job == soldier && member_list[room_mafia[room_pos].member_list[i]].live == FALSE) {
+                member_list[room_mafia[room_pos].member_list[i]].live = TRUE;
+                member_list[room_mafia[room_pos].member_list[i]].skill = use;
+            }
+        }
 }
 
 void change_day(int i, member buf, fd_set * reads)    
