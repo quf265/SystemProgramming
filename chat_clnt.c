@@ -15,24 +15,26 @@
 typedef enum{police,mafia,docter,soldier}jobs;
 typedef enum{dead,alive}life;
 typedef enum{use,unuse}capacity;
+typedef enum{normal, red,blue}color;
 
 typedef struct
 {
-    int valid;      //접속해있는 사람인지 아닌지 결정하는 변수
-    int first;      //처음입장했는지 아닌지 묻는 함수
-    int room;
-    int whisper;        //귓속말 대상을 정하는 함수
+    char valid; //접속해있는 사람인지 아닌지 결정하는 변수
+    char first; //처음입장했는지 아닌지 묻는 함수
+    char room;
     char type;
     int mafia_num;
     int citizen_num;
+    color write_color;
     char name[MAX_NAME_SIZE];
     char message[BUF_SIZE];
     //마피아게임을 위한 변수
-    char play;      //마피아게임중인지 확인
-    jobs job;   
+    char play; //마피아게임중인지 확인
+    jobs job;
     life live;
-    capacity skill;  //능력을 썼는지 유무
-
+    capacity skill; //능력을 썼는지 유무
+    char vote_num;   //투표를 얼만큼 받았는지 설정
+    char skill_traget; //스킬을 누구에게 쓸건지 정하는 함수
 } member;
 //사용자 변수
 
@@ -66,6 +68,7 @@ int main(int argc, char * argv[])
 		error_handling("connect() error");
 	
 	//*********************************************소켓 연결과 관련된 코드
+	memset(&buf,0,sizeof(buf));
 	pid = fork();
 	if(pid == 0)
 		write_routine(sock);
