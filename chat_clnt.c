@@ -1,26 +1,26 @@
 /*
 
-	gcc filename.c -lncursesw -lcurses -o filename
-	
-	--------------------------------------------------------------
-	|		win_read				|
-	|	-----------------------------------------		|
-	|	|				|	|
-	|	|				|	|
-	|	|	win_msg_scroll		|	|
-	|	|				|	|
-	|	|				|	|
-	|	|				|	|
-	|	----------------------------------------		|
-	|						|
-	--------------------------------------------------------------
-	--------------------------------------------------------------
-	|		win_write				|
-	|	-----------------------------------------	-	|
-	|	|	win_input_str		|	|
-	|	------------------------------------------	|
-	|						|
-	--------------------------------------------------------------
+gcc filename.c -lncursesw -lpthread -lcurses -o filename
+
+--------------------------------------------------------------
+|		win_read											|
+|	-----------------------------------------				|
+|	|										|				|
+|	|										|				|
+|	|	win_msg_scroll						|				|
+|	|										|				|
+|	|										|				|
+|	|										|				|
+|	----------------------------------------				|
+|															|
+--------------------------------------------------------------
+--------------------------------------------------------------
+|		win_write											|
+|	-----------------------------------------				|
+|	|	win_input_str						|				|
+|	------------------------------------------				|
+|															|
+--------------------------------------------------------------
 
 */
 
@@ -34,6 +34,8 @@
 #include<locale.h>
 #include<curses.h>
 #include<ncursesw/ncurses.h>
+#include<signal.h>
+#include<pthread.h>
 
 #define BUF_SIZE 100
 #define MAX_NAME_SIZE 20
@@ -53,38 +55,39 @@ typedef enum { use, unuse }capacity;
 
 typedef struct
 {
-    char valid; //접속해있는 사람인지 아닌지 결정하는 변수
-    char first; //처음입장했는지 아닌지 묻는 함수
-    char room;
-    char type;
-    int mafia_num;
-    int citizen_num;
-    char name[MAX_NAME_SIZE];
-    char message[BUF_SIZE];
-    //마피아게임을 위한 변수
-    char play; //마피아게임중인지 확인
-    jobs job;
-    life live;
-    capacity skill; //능력을 썼는지 유무
-    char vote_num;   //투표를 얼만큼 받았는지 설정
-    char skill_target; //스킬을 누구에게 쓸건지 정하는 함수
+	char valid; //접속해있는 사람인지 아닌지 결정하는 변수
+	char first; //처음입장했는지 아닌지 묻는 함수
+	char room;
+	char type;
+	int mafia_num;
+	int citizen_num;
+	char name[MAX_NAME_SIZE];
+	char message[BUF_SIZE];
+	//마피아게임을 위한 변수
+	char play; //마피아게임중인지 확인
+	jobs job;
+	life live;
+	capacity skill; //능력을 썼는지 유무
+	char vote_num;   //투표를 얼만큼 받았는지 설정
+	char skill_target; //스킬을 누구에게 쓸건지 정하는 함수
 } member;
 //사용자 변수
 
 void error_handling();
-void read_routine(int sock);
-void write_routine(int sock);
+void read_routine(void *socket);
+void write_routine(void *socket);
 int read_buf(int sock);
 
 member buf;
 member me;
 
 WINDOW *win_read, *win_msg_scroll, *win_write, *win_input_str;
+char temp[BUF_SIZE];	//buf.message에다가 바로 저장하면 메세지를 입력하는 도중 다른 사용자로부터 채팅이 날라오면 저장된 값이 바뀌기 때문에 temp사용
 
 int main(int argc, char * argv[])
 {
 	int sock;
-	pid_t pid;
+	pthread_t read_thread, write_thread;
 	struct sockaddr_in serv_adr;
 
 	if (argc != 3)
@@ -103,20 +106,20 @@ int main(int argc, char * argv[])
 		error_handling("connect() error");
 
 	//*********************************************소켓 연결과 관련된 코드
-	
+
 	setlocale(P_ALL, "ko_KR.utf8");				//ncurses에서 한글을 사용하기 위함
 	initscr();
-	
+
 	use_default_colors();
 	start_color();
 	init_pair(SYSTEM_COLOR, COLOR_RED, -1);
 	init_pair(WHISPER_COLOR, COLOR_YELLOW, -1);
-	
-	win_read = newwin(LINES-8, COLS-2, 0, 0);			//window 생성
-	win_msg_scroll = newwin(LINES-10, COLS-8, 1, 2);
-	win_write = newwin(5, COLS-2, LINES-8, 0);
-	win_input_str = newwin(2, COLS-6, LINES-6, 2);
-	
+
+	win_read = newwin(LINES - 8, COLS - 2, 0, 0);			//window 생성
+	win_msg_scroll = newwin(LINES - 10, COLS - 8, 1, 2);
+	win_write = newwin(5, COLS - 2, LINES - 8, 0);
+	win_input_str = newwin(1, COLS - 6, LINES - 6, 2);
+
 	scrollok(win_msg_scroll, TRUE);
 	box(win_read, 0, 0);
 	box(win_write, 0, 0);
@@ -126,24 +129,26 @@ int main(int argc, char * argv[])
 	wrefresh(win_read);
 	wrefresh(win_write);
 	wrefresh(win_input_str);
-	
-	memset(&buf,0,sizeof(buf));
-	pid = fork();
-	if (pid == 0)
-		write_routine(sock);
-	//자식은 쓰기를 담당
-	else
-		read_routine(sock);
-	//부모는 읽기를 담당
+
+	signal(SIGINT, SIG_IGN);							//signal 무시
+	signal(SIGQUIT, SIG_IGN);
+
+	memset(&buf, 0, sizeof(buf));
+
+	pthread_create(&read_thread, NULL, (void *)read_routine, (void *)&sock);		//쓰레드 사용
+	pthread_create(&write_thread, NULL, (void *)write_routine, (void *)&sock);
+	pthread_join(read_thread, NULL);
+	pthread_join(write_thread, NULL);
+
 	close(sock);
-	
-	getch();							//window 삭제
+	/*
+	getch();							//window 삭제 -> 여기도??
 	delwin(win_msg_scroll);
 	delwin(win_read);
 	delwin(win_write);
 	delwin(win_input_str);
 	endwin();
-	
+	*/
 	return 0;
 
 }
@@ -164,8 +169,9 @@ int read_buf(int sock) {
 }
 
 //curse로 꾸밀 때 아래부분을 꾸미면 될거 같습니다.
-void read_routine(int sock)
+void read_routine(void *socket)
 {
+	int sock = *((int *)socket);
 	while (1)
 	{
 		if ((read_buf(sock)) == -1) {
@@ -190,35 +196,47 @@ void read_routine(int sock)
 			wprintw(win_msg_scroll, "[%s] : /w %s\n", buf.name, buf.message);
 			wattroff(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
 			break;
-		case MAFIA_MESSAGE :
+		case MAFIA_MESSAGE:
 			wclear(win_msg_scroll);
-			wattron(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
+			wattron(win_msg_scroll, COLOR_PAIR(SYSTEM_COLOR));
 			wprintw(win_msg_scroll, "< 시스템 알림 > : /w %s\n", buf.message);
-			wattroff(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
-		default :
+			wattroff(win_msg_scroll, COLOR_PAIR(SYSTEM_COLOR));
+		default:
 			break;
 		}
-		
+
 		wrefresh(win_msg_scroll);
-		
-		wclear(win_input_str);
-		wmove(win_input_str, 0, 0);
+
+		wmove(win_input_str, strlen(temp), 0);	//원래 메세지 쓰던 위치로 돌아가야함
 		wrefresh(win_input_str);
 	}
+
+	//종료 후 입력창 비움
+	wmove(win_input_str, 0, 0);
+	wclrtobot(win_input_str);
+	wrefresh(win_input_str);
 }
 
 //또한 이 부분도 쓰는 부분으로 꾸며야 할 것입니다.
-void write_routine(int sock)
+void write_routine(void *socket)
 {
+	int sock = *((int *)socket);
 	while (1)
 	{
-		wgetnstr(win_input_str, buf.message, BUF_SIZE);		
-		buf.message[strlen(buf.message)] = '\0';
-
+		wgetstr(win_input_str, temp);
+		strncpy(buf.message, temp, BUF_SIZE);
 		if (buf.message[0] == '/') {	//   '/'로 시작할시 특수 이벤트를 넣기 위해 분리했습니다. 아이디어 주시면 감사합니다.
 			buf.type = SYSTEM_MESSAGE;
 			if (!strcmp(buf.message, "/end")) {	//이 if문은 연결을 닫는 코드로 크게 신경 안쓰셔도 됩니다.
 				write(sock, (char*)&buf, sizeof(member));
+
+				getch();							//여기서 window 삭제 -> main에서도 삭제?
+				delwin(win_msg_scroll);
+				delwin(win_read);
+				delwin(win_write);
+				delwin(win_input_str);
+				endwin();
+
 				shutdown(sock, SHUT_WR);
 			}
 			write(sock, (char*)&buf, sizeof(member));
@@ -228,6 +246,11 @@ void write_routine(int sock)
 			buf.type = USER_MESSAGE;
 			write(sock, (char*)&buf, sizeof(member));
 		}
+
+		//입력 후 입력창 비움
+		wmove(win_input_str, 0, 0);
+		wclrtobot(win_input_str);
+		wrefresh(win_input_str);
 	}
 }
 
@@ -237,4 +260,3 @@ void error_handling(char * message)
 	fputc('\n', stderr);
 	exit(1);
 }
-
