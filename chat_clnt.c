@@ -1,21 +1,55 @@
+/*
+
+	gcc filename.c -lncursesw -lcurses -o filename
+	
+	--------------------------------------------------------------
+	|		win_read				|
+	|	-----------------------------------------		|
+	|	|				|	|
+	|	|				|	|
+	|	|	win_msg_scroll		|	|
+	|	|				|	|
+	|	|				|	|
+	|	|				|	|
+	|	----------------------------------------		|
+	|						|
+	--------------------------------------------------------------
+	--------------------------------------------------------------
+	|		win_write				|
+	|	-----------------------------------------	-	|
+	|	|	win_input_str		|	|
+	|	------------------------------------------	|
+	|						|
+	--------------------------------------------------------------
+
+*/
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
 #include<unistd.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
-// #include <termios.h> why not include here? 
+#include<termios.h>
+#include<locale.h>
+#include<curses.h>
+#include<ncursesw/ncurses.h>
 
 #define BUF_SIZE 100
+#define MAX_NAME_SIZE 20
+
 #define FREE_MESSAGE '0'
 #define SYSTEM_MESSAGE '1'
 #define USER_MESSAGE '2'
-#define MAX_NAME_SIZE 20
+#define WHISPER_MESSAGE '3'
+#define MAFIA_MESSAGE '4'
 
-typedef enum{police,mafia,docter,soldier}jobs;
-typedef enum{dead,alive}life;
-typedef enum{use,unuse}capacity;
-typedef enum{normal, red,blue}color;
+#define SYSTEM_COLOR 1
+#define WHISPER_COLOR 3
+
+typedef enum { police, mafia, docter, soldier }jobs;
+typedef enum { dead, alive }life;
+typedef enum { use, unuse }capacity;
 
 typedef struct
 {
@@ -25,7 +59,6 @@ typedef struct
     char type;
     int mafia_num;
     int citizen_num;
-    color write_color;
     char name[MAX_NAME_SIZE];
     char message[BUF_SIZE];
     //마피아게임을 위한 변수
@@ -34,7 +67,7 @@ typedef struct
     life live;
     capacity skill; //능력을 썼는지 유무
     char vote_num;   //투표를 얼만큼 받았는지 설정
-    char skill_traget; //스킬을 누구에게 쓸건지 정하는 함수
+    char skill_target; //스킬을 누구에게 쓸건지 정하는 함수
 } member;
 //사용자 변수
 
@@ -46,52 +79,85 @@ int read_buf(int sock);
 member buf;
 member me;
 
+WINDOW *win_read, *win_msg_scroll, *win_write, *win_input_str;
+
 int main(int argc, char * argv[])
 {
 	int sock;
 	pid_t pid;
 	struct sockaddr_in serv_adr;
-	
-	if(argc!=3)
+
+	if (argc != 3)
 	{
-		printf("Usage : %s <IP> <PORT> \n",argv[0]);
+		printf("Usage : %s <IP> <PORT> \n", argv[0]);
 		exit(1);
 	}
-	sock = socket(PF_INET, SOCK_STREAM , 0);
-	if(sock == -1)
+	sock = socket(PF_INET, SOCK_STREAM, 0);
+	if (sock == -1)
 		error_handling("socket() error");
-	memset(&serv_adr , 0 , sizeof(serv_adr));
+	memset(&serv_adr, 0, sizeof(serv_adr));
 	serv_adr.sin_family = AF_INET;
 	serv_adr.sin_addr.s_addr = inet_addr(argv[1]);
 	serv_adr.sin_port = htons(atoi(argv[2]));
-	if(connect(sock, (struct sockaddr *)&serv_adr, sizeof(serv_adr)) ==-1)
+	if (connect(sock, (struct sockaddr *)&serv_adr, sizeof(serv_adr)) == -1)
 		error_handling("connect() error");
-	
+
 	//*********************************************소켓 연결과 관련된 코드
+	
+	setlocale(P_ALL, "ko_KR.utf8");				//ncurses에서 한글을 사용하기 위함
+	initscr();
+	
+	use_default_colors();
+	start_color();
+	init_pair(SYSTEM_COLOR, COLOR_RED, -1);
+	init_pair(WHISPER_COLOR, COLOR_YELLOW, -1);
+	
+	win_read = newwin(LINES-8, COLS-2, 0, 0);			//window 생성
+	win_msg_scroll = newwin(LINES-10, COLS-8, 1, 2);
+	win_write = newwin(5, COLS-2, LINES-8, 0);
+	win_input_str = newwin(2, COLS-6, LINES-6, 2);
+	
+	scrollok(win_msg_scroll, TRUE);
+	box(win_read, 0, 0);
+	box(win_write, 0, 0);
+
+	refresh();
+	wrefresh(win_msg_scroll);
+	wrefresh(win_read);
+	wrefresh(win_write);
+	wrefresh(win_input_str);
+	
 	memset(&buf,0,sizeof(buf));
 	pid = fork();
-	if(pid == 0)
+	if (pid == 0)
 		write_routine(sock);
-		//자식은 쓰기를 담당
+	//자식은 쓰기를 담당
 	else
 		read_routine(sock);
-		//부모는 읽기를 담당
+	//부모는 읽기를 담당
 	close(sock);
-	return 0 ;
-	#include<termios.h> // but here after return? 
+	
+	getch();							//window 삭제
+	delwin(win_msg_scroll);
+	delwin(win_read);
+	delwin(win_write);
+	delwin(win_input_str);
+	endwin();
+	
+	return 0;
+
 }
 //아래코드는 서버로 부터 데이터를 받아서 buf에 넣는 코드입니다.
-int read_buf(int sock){
+int read_buf(int sock) {
 	//printf("들어왔다.");
-	int full_len =0;
+	int full_len = 0;
 	int str_len = read(sock, (char*)&buf, sizeof(member));
 	full_len = str_len;
-	if(str_len == 0){
+	if (str_len == 0) {
 		return -1;
 	}
-	while(full_len < sizeof(member)){
-		printf("받은 바이트 수 : <%d>\n",str_len);
-		str_len = read(sock,(char*)(&buf+str_len),sizeof(member));
+	while (full_len < sizeof(member)) {
+		str_len = read(sock, (char*)&buf + str_len, sizeof(member));
 		full_len += str_len;
 	}
 	//printf("나온다.");
@@ -100,48 +166,64 @@ int read_buf(int sock){
 //curse로 꾸밀 때 아래부분을 꾸미면 될거 같습니다.
 void read_routine(int sock)
 {
-	//printf("사용 법은 다음과 같습니다.\n");
-	//printf("/end 종료하기\n/w 이름 채팅 (귓속말)");
-	while(1)
+	while (1)
 	{
-		printf("\n");
-		if((read_buf(sock))==-1){
+		if ((read_buf(sock)) == -1) {
 			break;
 		}
 		//printf("buf_type : %c ",buf.type);
 		//buf.type은 세종류가 있고 이는 서버에서 데이터를 보낼때 결정합니다.
-		switch(buf.type){
-			case FREE_MESSAGE:
-				printf("%s",buf.message);
-				break;
-			case SYSTEM_MESSAGE:
-				printf("< 시스템 알림 > : %s ",buf.message);
-				break;
-			case USER_MESSAGE:
-				printf("[%s] : %s",buf.name,buf.message);
-				break;
+		switch (buf.type) {
+		case FREE_MESSAGE:
+			wprintw(win_msg_scroll, "%s\n", buf.message);
+			break;
+		case SYSTEM_MESSAGE:
+			wattron(win_msg_scroll, COLOR_PAIR(SYSTEM_COLOR));
+			wprintw(win_msg_scroll, "< 시스템 알림 > : %s\n", buf.message);
+			wattroff(win_msg_scroll, COLOR_PAIR(SYSTEM_COLOR));
+			break;
+		case USER_MESSAGE:
+			wprintw(win_msg_scroll, "[%s] : %s\n", buf.name, buf.message);
+			break;
+		case WHISPER_MESSAGE:
+			wattron(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
+			wprintw(win_msg_scroll, "[%s] : /w %s\n", buf.name, buf.message);
+			wattroff(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
+			break;
+		case MAFIA_MESSAGE :
+			wclear(win_msg_scroll);
+			wattron(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
+			wprintw(win_msg_scroll, "< 시스템 알림 > : /w %s\n", buf.message);
+			wattroff(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
+		default :
+			break;
 		}
+		
+		wrefresh(win_msg_scroll);
+		
+		wclear(win_input_str);
+		wmove(win_input_str, 0, 0);
+		wrefresh(win_input_str);
 	}
-	printf("< 시스템 알림 > : 다음에 또 뵐게요!\n");
 }
 
 //또한 이 부분도 쓰는 부분으로 꾸며야 할 것입니다.
 void write_routine(int sock)
 {
-	while(1)
+	while (1)
 	{
-		fgets(buf.message, BUF_SIZE, stdin);
-		buf.message[strlen(buf.message)-1] = '\0';
-		
-		if(buf.message[0] == '/'){	//   '/'로 시작할시 특수 이벤트를 넣기 위해 분리했습니다. 아이디어 주시면 감사합니다.
-			buf.type=SYSTEM_MESSAGE;
-			if(!strcmp(buf.message,"/end")){	//이 if문은 연결을 닫는 코드로 크게 신경 안쓰셔도 됩니다.
+		wgetnstr(win_input_str, buf.message, BUF_SIZE);		
+		buf.message[strlen(buf.message)] = '\0';
+
+		if (buf.message[0] == '/') {	//   '/'로 시작할시 특수 이벤트를 넣기 위해 분리했습니다. 아이디어 주시면 감사합니다.
+			buf.type = SYSTEM_MESSAGE;
+			if (!strcmp(buf.message, "/end")) {	//이 if문은 연결을 닫는 코드로 크게 신경 안쓰셔도 됩니다.
 				write(sock, (char*)&buf, sizeof(member));
-				shutdown(sock , SHUT_WR);
+				shutdown(sock, SHUT_WR);
 			}
 			write(sock, (char*)&buf, sizeof(member));
 		}
-		else{
+		else {
 			//이부분은 일반 채팅 부분입니다.
 			buf.type = USER_MESSAGE;
 			write(sock, (char*)&buf, sizeof(member));
@@ -152,7 +234,7 @@ void write_routine(int sock)
 void error_handling(char * message)
 {
 	fputs(message, stderr);
-	fputc('\n',stderr);
+	fputc('\n', stderr);
 	exit(1);
 }
 
