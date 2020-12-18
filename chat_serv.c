@@ -37,6 +37,8 @@
 #define FULL 1
 #define TRUE 1
 #define FALSE 0
+#define PIPE 3
+#define NO_PIPE 0
 #define error_message(x)   \
     {                      \
         printf("%s\n", x); \
@@ -140,6 +142,12 @@ blocking blocking_list[MAX_MEMBER]; //차단하기위한 변수
 member member_list[MAX_MEMBER];
 room_info room_mafia[MAX_ROOM]; //마피아하는 방을 위한 변수
 
+
+//디버깅용 코드
+void display_job(int mem_num, int room_pos);
+void display_member(int fd);
+void display_socket(int fd_max);
+
 //사용자를 담는 코드
 int member_num;
 void new_member(int num);
@@ -152,6 +160,7 @@ void first_room(member buf, int i, int fd_max);                    //처음왔�
 void out_room(member buf, fd_set* reads, int i, int fd_max);       //나갈때 정리하는 함수
 
 //채팅과 관련된 함수
+int receive_message(member * buf, int from);
 void message_task(member buf, int i, int* fd_max, fd_set*); //메세지를 다루는 함수
 void send_message(member buf, char type, int dest);          //메세지를 보내는 함수
 
@@ -168,36 +177,7 @@ void change_day(int i, member buf, fd_set* reads);     //마피아방의 현재 
 void result_vote(int room_pos);     //투표결과
 void result_night(int room_pos);        //밤의 결과
 
-void display_job(int mem_num, int room_pos)
-{
-    //printf("직업을 출력합니다.\n");
-    jobs a = -1;
-    for (int i = 0; i < mem_num; i++)
-    {
-        a = member_list[room_mafia[room_pos].member_list[i]].job;
-        switch (a)
-        {
-        case mafia:
-            printf("<%s>님은 마피아입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
-            break;
-        case citizen:
-            printf("<%s>님은 시민입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
-            break;
-        case police:
-            printf("<%s>님은 경찰입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
-            break;
-        case docter:
-            printf("<%s>님은 의사입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
-            break;
-        case soldier:
-            printf("<%s>님은 군인입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
-            break;
-        default:
-            printf("당신은 누구십니까?");
-        }
-    }
-    //printf("직업출력을 끝냈습니다.\n");
-}
+
 
 int main(int argc, char* argv[])
 {
@@ -213,6 +193,7 @@ int main(int argc, char* argv[])
     char buf_temp[BUF_SIZE]; //메세지 옮기기위한 변수
     int room_check = 0;      //방리스트 보여줄때 쓰는 변수
     char message_type[10];   //메세지 타입(FREE,USER,SYSTEM)
+    signal(SIGQUIT,SIG_IGN);//무시합니다.
 
     if (argc != 2)
     {
@@ -293,7 +274,7 @@ int main(int argc, char* argv[])
                             if (fd_max < clnt_sock)
                                 fd_max = clnt_sock;
                             new_member(clnt_sock);
-                            strcpy(buf.message, "**********환영니다! 사용하실 이름을 적어주세요.***********");
+                            strcpy(buf.message, "**********환영합니다! 사용하실 이름을 적어주세요.***********");
                             send_message(buf, SYSTEM_MESSAGE, clnt_sock);
                             printf("<사용자 연결>: %d\n", clnt_sock);
                         }
@@ -301,6 +282,13 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
+                    int read_result = receive_message(&buf,i);
+                    printf("나온다.\n");
+                    if(read_result == -1){
+                        printf("받는데 실패했습니다.\n");
+                        continue;
+                    }
+                    /*
                     str_len = read(i, (char*)&buf, sizeof(member));
                     int full_len = str_len;
                     while (full_len < sizeof(member)) //한번에 다 못받았을 때 다 받고 나서 다음 로직으로 가야한다.
@@ -309,11 +297,12 @@ int main(int argc, char* argv[])
                         {
                             break;
                         }
-                        str_len = read(i, (char*)(&buf + str_len), sizeof(member));
+                        str_len = read(i, (char*)&buf + str_len, sizeof(member));
                         full_len += str_len;
-                    }
+                    }*/
+                    
                     printf("From client : %s\n", buf.message);
-                    if (full_len == 0 || !strcmp(buf.message, "/end")) //연결을 끊었을 때
+                    if (read_result == 0 || !strcmp(buf.message, "/end")) //연결을 끊었을 때
                     {
                         if (member_list[i].valid == TRUE)   //이것은 유저가 나갔을 때만 다루어져야한다.
                         {
@@ -585,6 +574,15 @@ void end_mafia_game(int i, int room_pos, fd_set* reads)
     close(room_mafia[room_pos].to_child_pipe[1]);
     FD_CLR(i, reads);
     FD_CLR(room_mafia[room_pos].to_child_pipe[1], reads);
+    if(member_list[i].type == PIPE){
+        member_list[i].type = NO_PIPE;
+        printf("파이프 [%d]를 해제합니다.\n",i);
+    }
+    if(member_list[room_mafia[room_pos].to_child_pipe[1]].type == PIPE){
+        member_list[room_mafia[room_pos].to_child_pipe[1]].type = NO_PIPE;
+        printf("파이프 [%d]를 해제합니다.\n",room_mafia[room_pos].to_child_pipe[1]);
+    }
+    printf("파이프를 전부 해제했습니다.\n");
     int mem_num = room_mafia[room_pos].mem_number;
     for (int j = 0; j < mem_num; j++)
     {
@@ -684,6 +682,14 @@ void* mafia_game(void* args)
         buf.play = TRUE;
         buf.room = room_pos; //몇번방인지 항상 알려준다.
         send_message(buf, SYSTEM_MESSAGE, to_parent);
+        if (receive_message(&buf,from_parent) == 0)
+        { //항상 날짜를 바꾸고 검사한다.
+            printf("접속을 종료합니다.\n");
+            close(from_parent);
+            close(to_parent);
+            exit(0);
+        }
+        /*
         if (read(from_parent, (char*)&buf, sizeof(member)) == 0)
         { //항상 날짜를 바꾸고 검사한다.
             printf("접속을 종료합니다.\n");
@@ -691,6 +697,7 @@ void* mafia_game(void* args)
             close(to_parent);
             exit(0);
         }
+        */
         printf("마피아수 : %d, 시민수 : %d\n", buf.mafia_num, buf.citizen_num);
         if (buf.mafia_num >= buf.citizen_num || buf.mafia_num == 0)
         {
@@ -720,7 +727,8 @@ void* mafia_game(void* args)
         }
         j++;
     }*/
-    read(from_parent, (char*)&buf, sizeof(member));
+    //read(from_parent, (char*)&buf, sizeof(member));
+    receive_message(&buf,from_parent);
     //free(room_mafia[room_pos].member_list);
     close(from_parent);
     close(to_parent);
@@ -798,6 +806,11 @@ int start_mafia(int i, int* fd_max, fd_set* reads)
     int temp_member[12]; //최대 열두명이니까
     int error = FALSE;
     int room_pos = 0;
+    for(int j = 0 ; j < *fd_max+1 ; j++){
+        if(member_list[j].valid == TRUE){
+            display_member(j);
+        }
+    }
     for (int j = 0; j < *fd_max + 1; j++)
     {
         if (member_list[j].valid == TRUE && member_list[j].room == member_list[i].room)
@@ -858,6 +871,8 @@ int start_mafia(int i, int* fd_max, fd_set* reads)
     close(room_mafia[room_pos].to_child_pipe[0]);
     FD_SET(room_mafia[room_pos].to_main_pipe[0], reads);
     FD_SET(room_mafia[room_pos].to_child_pipe[1], reads); //이걸등록해야 나중에 같은 디스크립터 번호로 소켓에 안보낸다.
+    member_list[room_mafia[room_pos].to_main_pipe[0]].type = PIPE;  //파이프임을 알려준다.  디버깅용
+    member_list[room_mafia[room_pos].to_child_pipe[1]].type =PIPE;
     if (*fd_max < room_mafia[room_pos].to_child_pipe[1])
     {
         *fd_max = room_mafia[room_pos].to_child_pipe[1];
@@ -874,7 +889,11 @@ int start_mafia(int i, int* fd_max, fd_set* reads)
     strcpy(buf.message, "밤이 되었습니다.");
     mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
     jobs job;
-    for (int j = 0; j < member_num; j++) {
+    printf("디버깅-------------------------------\n");
+    printf("room_pos는 %d입니다.\n",room_pos);
+    printf("member_num은 %d입니다.\n",mem_number);
+    printf("디버깅-------------------------------\n");
+    for (int j = 0; j < mem_number; j++) {
         job = member_list[room_mafia[room_pos].member_list[j]].job;
         switch (job)
         {
@@ -953,7 +972,7 @@ void out_room(member buf, fd_set* reads, int i, int fd_max)
     }*/
     strcpy(name, member_list[i].name);
     memset(&member_list[i], EMPTY, sizeof(member_list[i]));                                      //전부 0으로 초기화시킨다.
-    //memset((void *)blocking_list[i].block_member, FALSE, sizeof(blocking_list[i].block_member)); //차단정보 초기화
+    memset(blocking_list[i].block_member, FALSE, sizeof(blocking_list[i].block_member)); //차단정보 초기화
     close(i);
     printf("closed client: %d \n", i);
     if (room != EMPTY)
@@ -969,6 +988,7 @@ void out_room(member buf, fd_set* reads, int i, int fd_max)
             }
         }
     }
+    member_num--;
 }
 
 void first_room(member buf, int i, int fd_max)
@@ -1248,23 +1268,33 @@ int checking_name(member buf, int fd_max)
     return 1;
 }
 
+int receive_message(member * buf, int from){
+    //printf("받는다.\n");
+    int str_len = 0;
+    int full_message = 0;
+    
+    while(full_message < sizeof(member)){
+        //printf("시작 주소 : %d\n",buf);
+        //printf("더한 주소 : %d\n",(char*)buf+full_message);
+        str_len=read(from,(char*)buf+full_message,sizeof(member));
+        printf("받는다3\n");
+        if(str_len == 0 || str_len == -1){      //실패했거나 EOF를 받았거나
+            return str_len;
+        }
+        full_message += str_len;
+        //printf("full_message : %d\n",full_message);
+        //printf("sizeof(member) : %d\n",sizeof(member));
+    }
+    return full_message;
+}
+
 void send_message(member buf, char type, int dest)
 {
+    //printf("-----------------------디버깅용---------------------\n");
     printf("buf.message : %s\n", buf.message); //디버깅용
     buf.type = type;
-    printf("보냅니다 1-------------\n");
-    if (member_list[dest].valid == TRUE)
-        printf("<%s>에게 보냈습니다.\n", member_list[dest].name); //디버깅용
-    else {
-        printf("파이프<%d>에게 보냈습니다.\n", dest);
-    }
     write(dest, (char*)&buf, sizeof(member));
-    printf("보냅니다 2------------------\n");
-    if (member_list[dest].valid == TRUE)
-        printf("<%s>에게 보냈습니다.\n", member_list[dest].name); //디버깅용
-    else {
-        printf("파이프<%d>에게 보냈습니다.\n", dest);
-    }
+    //display_member(dest);
 }
 
 int alreay_print_room(int* room_list, int room_num, int fill_num)
@@ -1291,4 +1321,71 @@ void error_handling(char* buf)
     fputs(buf, stderr);
     fputc('\n', stderr);
     exit(1);
+}
+
+//디버깅용 코드
+
+void display_socket(int fd_max){
+    for(int i = 3 ; i < fd_max+1 ; i++){
+        printf("[%d]파일 디스크립터입니다.\n",i);
+        if(member_list[i].valid == TRUE){
+            printf("name : %s\n",member_list[i].name);
+        }
+        else{
+            printf("파이프입니다.\n");
+        }
+    }
+
+
+}
+
+void display_member(int fd){
+
+    printf("-----------------------디버깅용---------------------\n");
+    printf("file descriptor : %d\n",fd);
+    printf("valid : %d\n",member_list[fd].valid);
+    printf("first : %d\n",member_list[fd].first);
+    printf("room : %d\n",member_list[fd].room);
+    printf("type : %d\n", member_list[fd].type);
+    //printf("mafia_num : %d\n",member_list[fd].mafia_num);
+    //printf("citizen_num : %d\n",member_list[fd].citizen_num);
+    //printf("write_color : %d\n",member_list[fd].write_color);
+    //printf("name : %s\n",member_list[fd].name);
+    printf("play : %d\n",member_list[fd].play);
+    printf("job : %d\n",member_list[fd].job);
+    printf("live : %d\n",member_list[fd].live);
+    printf("capacity : %d\n",member_list[fd].skill);
+    printf("-----------------------디버깅용---------------------\n");
+    
+}
+
+void display_job(int mem_num, int room_pos)
+{
+    //printf("직업을 출력합니다.\n");
+    jobs a = -1;
+    for (int i = 0; i < mem_num; i++)
+    {
+        a = member_list[room_mafia[room_pos].member_list[i]].job;
+        switch (a)
+        {
+        case mafia:
+            printf("<%s>님은 마피아입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
+            break;
+        case citizen:
+            printf("<%s>님은 시민입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
+            break;
+        case police:
+            printf("<%s>님은 경찰입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
+            break;
+        case docter:
+            printf("<%s>님은 의사입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
+            break;
+        case soldier:
+            printf("<%s>님은 군인입니다.\n", member_list[room_mafia[room_pos].member_list[i]].name);
+            break;
+        default:
+            printf("당신은 누구십니까?");
+        }
+    }
+    //printf("직업출력을 끝냈습니다.\n");
 }
