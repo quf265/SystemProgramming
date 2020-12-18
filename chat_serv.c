@@ -53,6 +53,8 @@
 #define FREE_MESSAGE '0'
 #define SYSTEM_MESSAGE '1'
 #define USER_MESSAGE '2'
+#define WHISPER_MESSAGE '3'
+#define MAFIA_MESSAGE '4'
 //free는 메세지만 보내고 싶을때
 //sysmtem은 system출력하고 싶을때
 //user은 사용자이름 출력하고 싶을 때 사용한다.
@@ -86,12 +88,6 @@ typedef enum
     night
 } today;
 
-typedef enum {
-    normal,
-    red,
-    blue
-}color;
-
 typedef struct
 {
     char valid; //접속해있는 사람인지 아닌지 결정하는 변수
@@ -100,7 +96,6 @@ typedef struct
     char type;
     int mafia_num;
     int citizen_num;
-    color write_color;
     char name[MAX_NAME_SIZE];
     char message[BUF_SIZE];
     //마피아게임을 위한 변수
@@ -193,6 +188,8 @@ int main(int argc, char* argv[])
     char buf_temp[BUF_SIZE]; //메세지 옮기기위한 변수
     int room_check = 0;      //방리스트 보여줄때 쓰는 변수
     char message_type[10];   //메세지 타입(FREE,USER,SYSTEM)
+    
+    //디버깅용
     signal(SIGQUIT,SIG_IGN);//무시합니다.
 
     if (argc != 2)
@@ -313,7 +310,6 @@ int main(int argc, char* argv[])
                     //연결 요청 외의 것들을 다루는 곳
                     else
                     {
-                        buf.write_color = normal;       //client로 부터 읽었는게 영향을 미친다.
                         //*************************************************************************************************************************
                         //초기에 방설정과 이름을 정하는 함수 시작
                         if (member_list[i].valid == FALSE)      //파이프로 부터 온 신호
@@ -884,7 +880,7 @@ int start_mafia(int i, int* fd_max, fd_set* reads)
     printf("from_cilhd_pipe[0] : <%d>\n",room_mafia[room_pos].to_main_pipe[0]);
     */
     strcpy(buf.message, "*********<마피아 게임을 시작합니다.>*********\n");
-    mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
+    mafia_send_message(buf, MAFIA_MESSAGE, room_pos);			//마피아 시작 시 채팅 화면을 clear하기 위해 MAFIA_MESSAGE 사용
     room_mafia[room_pos].day = night;
     strcpy(buf.message, "밤이 되었습니다.");
     mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
@@ -970,6 +966,11 @@ void out_room(member buf, fd_set* reads, int i, int fd_max)
             }
         }
     }*/
+    strcpy(buf.message, "----------------------------------------------------------------------------------------------------------");
+    send_message(buf, FREE_MESSAGE, i);
+    strcpy(buf.message, "다음에 뵐게요!");
+    send_message(buf, SYSTEM_MESSAGE, i);
+
     strcpy(name, member_list[i].name);
     memset(&member_list[i], EMPTY, sizeof(member_list[i]));                                      //전부 0으로 초기화시킨다.
     memset(blocking_list[i].block_member, FALSE, sizeof(blocking_list[i].block_member)); //차단정보 초기화
@@ -1018,6 +1019,13 @@ void first_room(member buf, int i, int fd_max)
     strcat(buf_temp, "방에 입장하셨습니다.");
     strcpy(buf.message, buf_temp);
     send_message(buf, SYSTEM_MESSAGE, i);
+
+    strcpy(buf.message, "/end:종료, /w 이름:(귓속말), /b 이름:x차단x, /start:마피아 게임 시작");
+    send_message(buf, SYSTEM_MESSAGE, i);
+  
+    strcpy(buf.message, "----------------------------------------------------------------------------------------------------------");
+    send_message(buf, FREE_MESSAGE, i);
+
     for (int j = 0; j < fd_max + 1; j++)
     {
         if (member_list[j].valid == TRUE && (member_list[j].room == member_list[i].room && i != j))
@@ -1136,7 +1144,6 @@ void message_task(member buf, int i, int* fd_max, fd_set* reads)
                             */
                             if (blocking_list[j].block_member[i] == FALSE) //차단도 안당해있어야함
                             {
-                                buf.write_color = red;
                                 strcpy(buf.message, ptr);
                                 strcpy(buf.name, name);
                                 send_message(buf, USER_MESSAGE, j);
