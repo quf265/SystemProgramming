@@ -113,8 +113,8 @@ int main(int argc, char * argv[])
 
 	use_default_colors();
 	start_color();
-	init_pair(SYSTEM_COLOR, COLOR_RED, -1);
-	init_pair(WHISPER_COLOR, COLOR_YELLOW, -1);
+	init_pair(SYSTEM_COLOR, COLOR_YELLOW, -1);
+	init_pair(WHISPER_COLOR, COLOR_BLUE, -1);
 
 	win_read = newwin(LINES - 8, COLS - 2, 0, 0);			//window 생성
 	win_msg_scroll = newwin(LINES - 10, COLS - 8, 1, 2);
@@ -203,13 +203,13 @@ void read_routine(void *socket)
 			break;
 		case WHISPER_MESSAGE:
 			wattron(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
-			wprintw(win_msg_scroll, "[%s] : /w %s\n", buf.name, buf.message);
+			wprintw(win_msg_scroll, "[%s] : %s\n", buf.name, buf.message);
 			wattroff(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
 			break;
 		case MAFIA_MESSAGE: case MAFIA_END_MESSAGE :
 			wclear(win_msg_scroll);
 			wattron(win_msg_scroll, COLOR_PAIR(SYSTEM_COLOR));
-			wprintw(win_msg_scroll, "< 시스템 알림 > : /w %s\n", buf.message);
+			wprintw(win_msg_scroll, "< 시스템 알림 > : %s\n", buf.message);
 			wattroff(win_msg_scroll, COLOR_PAIR(SYSTEM_COLOR));
 		default:
 			break;
