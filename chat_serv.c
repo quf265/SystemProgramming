@@ -106,7 +106,7 @@ typedef struct
     life live;
     capacity skill;    //능력을 썼는지 유무
     char vote_num;     //투표를 얼만큼 받았는지 설정
-    char skill_target; //스킬을 누구에게 쓸건지 정하는 함수  //군인은 이걸로 능력을 썼는지 안썼는지 결정하겠다.
+    char skill_target; //스킬을 누구에게 쓸건지 정하는 함수  //군인은 이걸로 능력을 썼는지 안썼는지 결정하겠다. EMPTY면 아직 안쓴거 FULL이면 쓴거
 } member;
 //사용자 변수
 
@@ -382,7 +382,8 @@ void mafia_chat(int i, int fd_max, member buf, fd_set *reads)
         }
         else
         {
-            if(member_list[i].live == dead){    //죽은 자는 말을 하지 못한다.
+            if (member_list[i].live == dead)
+            { //죽은 자는 말을 하지 못한다.
                 return;
             }
             strcpy(buf.name, member_list[i].name);
@@ -392,15 +393,16 @@ void mafia_chat(int i, int fd_max, member buf, fd_set *reads)
     else if (room_mafia[room_pos].day == vote)
     { //투표시
         char name[MAX_NAME_SIZE];
-        
+
         if (member_list[i].live == dead)
         { //죽은 자는 투표못함
             return;
         }
-        if(buf.type == USER_MESSAGE){
-            strcpy(buf.message,"/이름 으로 투표해주세요.");
-            send_message(buf,SYSTEM_MESSAGE,i);
-            return;   
+        if (buf.type == USER_MESSAGE)
+        {
+            strcpy(buf.message, "/이름 으로 투표해주세요.");
+            send_message(buf, SYSTEM_MESSAGE, i);
+            return;
         }
         if (member_list[i].skill == use)
         {
@@ -413,7 +415,7 @@ void mafia_chat(int i, int fd_max, member buf, fd_set *reads)
         {
             if (room_mafia[room_pos].member_list[j] != EMPTY && member_list[room_mafia[room_pos].member_list[j]].live == alive)
             {
-                if (!strcmp(member_list[room_mafia[room_pos].member_list[j]].name, name))   //같은 이름을 올려야함
+                if (!strcmp(member_list[room_mafia[room_pos].member_list[j]].name, name)) //같은 이름을 올려야함
                 {
                     member_list[room_mafia[room_pos].member_list[j]].vote_num++;
                     member_list[i].skill = use;
@@ -425,25 +427,24 @@ void mafia_chat(int i, int fd_max, member buf, fd_set *reads)
                 }
             }
         }
-        strcpy(buf.message, "존재하지 않는 사용자입니다.");
+        strcpy(buf.message, "존재하지 않거나 죽은 사용자입니다.");
         send_message(buf, SYSTEM_MESSAGE, i);
     }
     else if (room_mafia[room_pos].day == night)
     {   //밤에 능력을 쓸 시
         //시민과 군인은 채팅 불가
+        if (member_list[i].live == dead)
+        {
+            return;
+        }
         char name[MAX_NAME_SIZE];
-        int target;
         switch (member_list[i].job)
-        {   
-        case citizen:   
+        {
+        case citizen:
         case soldier:
             return;
         case police:
-            if (member_list[i].live == dead)
-            {
-                return;
-            }
-            if (buf.type == SYSTEM_MESSAGE)
+            if (buf.type == USER_MESSAGE)
             {
                 strcpy(buf.message, "/이름 으로 확인해주세요.");
                 send_message(buf, SYSTEM_MESSAGE, i);
@@ -455,84 +456,76 @@ void mafia_chat(int i, int fd_max, member buf, fd_set *reads)
                 send_message(buf, SYSTEM_MESSAGE, i);
                 return;
             }
+            strcpy(name, buf.message + 1);
             for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
             {
-                if (member_list[room_mafia[room_pos].member_list[j]].valid == TRUE && member_list[room_mafia[room_pos].member_list[j]].live == alive)
+                if (room_mafia[room_pos].member_list[j] != EMPTY && member_list[room_mafia[room_pos].member_list[j]].live == alive)
                 {
-                    member_list[room_mafia[room_pos].member_list[j]].vote_num++;
-                    member_list[i].skill = use;
-                    strcpy(buf.message, "<");
-                    strcat(buf.message, name);
-                    strcat(buf.message, ">님을 투표했습니다.");
-                    send_message(buf, SYSTEM_MESSAGE, i);
-                    return;
+                    if (!strcmp(member_list[room_mafia[room_pos].member_list[j]].name, name))
+                    { //같은 이름이 있을 때 능력을 발동시킨다.
+                        if (member_list[room_mafia[room_pos].member_list[j]].job == mafia)
+                        {
+                            strcpy(buf.message, "<");
+                            strcat(buf.message, member_list[room_mafia[room_pos].member_list[j]].name);
+                            strcat(buf.message, ">은 마피아입니다.");
+                            send_message(buf, SYSTEM_MESSAGE, i);
+                            member_list[i].skill = use;
+                            return;
+                        }
+                        else
+                        {
+                            strcpy(buf.message, "<");
+                            strcat(buf.message, member_list[room_mafia[room_pos].member_list[j]].name);
+                            strcat(buf.message, ">은 마피아가 아닙니다.");
+                            send_message(buf, SYSTEM_MESSAGE, i);
+                            member_list[i].skill = use;
+                            return;
+                        }
+                    }
                 }
             }
-            if (member_list[room_mafia[room_pos].member_list[target]].job == mafia)
-            {
-                strcpy(buf.message, "<");
-                strcat(buf.message, member_list[room_mafia[room_pos].member_list[target]].name);
-                strcat(buf.message, ">은 마피아입니다.");
-                send_message(buf, SYSTEM_MESSAGE, i);
-                member_list[i].skill = FALSE;
-                return;
-            }
-            else
-            {
-                strcpy(buf.message, "<");
-                strcat(buf.message, member_list[room_mafia[room_pos].member_list[target]].name);
-                strcat(buf.message, ">은 마피아가 아닙니다.");
-                send_message(buf, SYSTEM_MESSAGE, i);
-                member_list[i].skill = FALSE;
-                return;
-            } //경찰 끝
+            strcpy(buf.message, "존재하지 않거나 죽은 사용자입니다.");
+            send_message(buf, SYSTEM_MESSAGE, i);
+            //경찰 끝
             break;
         case docter:
-            if (member_list[i].live == dead)
-            {
-                return;
-            }
             if (member_list[i].skill == use)
             {
                 strcpy(buf.message, "이미 한명을 지정했습니다.");
                 send_message(buf, SYSTEM_MESSAGE, i);
                 return;
             }
-            target = atoi(buf.message);
-            if (target < 0 || target >= room_mafia[room_pos].mem_number)
+            strcpy(name, buf.message + 1);
+            for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
             {
-                strcpy(buf.message, "참가자 중 한명을 골라야합니다.");
-                send_message(buf, SYSTEM_MESSAGE, i);
-                return;
+                if (room_mafia[room_pos].member_list[j] != EMPTY && member_list[room_mafia[room_pos].member_list[j]].live == alive)
+                {
+                    if (!strcmp(member_list[room_mafia[room_pos].member_list[j]].name, name))
+                    {                                                                      //같은 이름이 있을 때 능력을 발동시킨다.
+                        member_list[i].skill_target = room_mafia[room_pos].member_list[j]; //살릴 사람을 결정한다.
+                        strcpy(buf.message, "<");
+                        strcat(buf.message, member_list[room_mafia[room_pos].member_list[j]].name);
+                        strcat(buf.message, ">님을 치료합니다. ");
+                        send_message(buf, SYSTEM_MESSAGE, i);
+                        member_list[i].skill = use;
+                        return;
+                    }
+                }
             }
-            if (member_list[room_mafia[room_pos].member_list[target]].valid == FALSE)
-            {
-                strcpy(buf.message, "나간 사용자 입니다.");
-                send_message(buf, SYSTEM_MESSAGE, i);
-                return;
-            }
-            member_list[i].skill_target = target;
-            member_list[i].skill = use;
-            strcpy(buf.message, "<");
-            strcat(buf.message, member_list[room_mafia[room_pos].member_list[target]].name);
-            strcat(buf.message, ">님을 치료 합니다.");
+            strcpy(buf.message, "존재하지 않거나 죽은 사용자입니다.");
             send_message(buf, SYSTEM_MESSAGE, i);
             break; //의사끝
         case mafia:
-            if (member_list[i].live == dead)
-            { //죽은자는 말이 없다.
-                return;
-            }
             if (buf.type == USER_MESSAGE)
             {
                 for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
                 {
-                    if (member_list[room_mafia[room_pos].member_list[j]].valid == TRUE)
+                    if (room_mafia[room_pos].member_list[j] != EMPTY) //나간 사용자면 안된다.
                     {
                         if (member_list[room_mafia[room_pos].member_list[j]].job == mafia) //마피아끼리는 말할 수 있음
                         {                                                                  //죽은자도 들을 수 있다.
                             strcpy(buf.name, member_list[i].name);
-                            send_message(buf, USER_MESSAGE, j);
+                            send_message(buf, USER_MESSAGE, room_mafia[room_pos].member_list[j]);
                         }
                     }
                 }
@@ -545,71 +538,37 @@ void mafia_chat(int i, int fd_max, member buf, fd_set *reads)
                     send_message(buf, SYSTEM_MESSAGE, i);
                     return;
                 }
-                target = atoi(buf.message);
-                if (target < 0 || target >= room_mafia[room_pos].mem_number)
-                {
-                    strcpy(buf.message, "참가자 중 한명을 골라야합니다.");
-                    send_message(buf, SYSTEM_MESSAGE, i);
-                    return;
-                }
-                if (member_list[room_mafia[room_pos].member_list[target]].valid == FALSE)
-                {
-                    strcpy(buf.message, "나간 사용자 입니다.");
-                    send_message(buf, SYSTEM_MESSAGE, i);
-                    return;
-                }
+                strcpy(name, buf.message + 1); //이름 저장
                 for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
                 {
-                    if (member_list[room_mafia[room_pos].member_list[j]].valid == TRUE)
+                    if (room_mafia[room_pos].member_list[j] != EMPTY) //나간사용자면 검사할 필요 없다.
                     {
-                        if (member_list[room_mafia[room_pos].member_list[j]].job == mafia) //마피아끼리는 알아야함
-                        {                                                                  //죽은자도 들을 수 있다.
-                            member_list[room_mafia[room_pos].member_list[j]].skill_target = target;
-                            strcpy(buf.message, "<");
-                            strcat(buf.message, member_list[room_mafia[room_pos].member_list[j]].name);
-                            strcat(buf.message, ">를 목표로 지정했습니다.");
-                            send_message(buf, SYSTEM_MESSAGE, j);
+                        if (!strcmp(name, member_list[room_mafia[room_pos].member_list[j]].name) && member_list[room_mafia[room_pos].member_list[j]].live == alive)
+                        {
+                            for (int k = 0; k < room_mafia[room_pos].mem_number; k++)
+                            {
+                                if (room_mafia[room_pos].member_list[k] != EMPTY && member_list[room_mafia[room_pos].member_list[k]].job == mafia)
+                                {
+                                    member_list[room_mafia[room_pos].member_list[k]].skill = use;
+                                    member_list[room_mafia[room_pos].member_list[k]].skill_target = room_mafia[room_pos].member_list[j];
+                                    strcpy(buf.message, "<");
+                                    strcat(buf.message, member_list[room_mafia[room_pos].member_list[j]].name);
+                                    strcat(buf.message, ">를 목표로 지정했습니다.");
+                                    send_message(buf, SYSTEM_MESSAGE, room_mafia[room_pos].member_list[k]);
+                                }
+                            }
+                            break;
                         }
                     }
                 }
             }
+            strcpy(buf.message, "존재하지 않거나 죽은 사용자입니다.");
+            strcpy(buf.name,member_list[i].name);
+            send_message(buf, buf.type, i);
             break;
         default:
             return;
-        };
-        /*
-        if (member_list[i].job == citizen || member_list[i].job == soldier)
-            return;
-        //의사, 경찰, 마피아는 채팅으로 능력을 쓸 타겟의 이름만 말할 수 있음
-        else
-        {
-            if (buf.type == SYSTEM_MESSAGE)
-            {
-                strcpy(buf.message, "마피아 게임중에는 메세지를 허용하지 않습니다.");
-                send_message(buf, SYSTEM_MESSAGE, i);
-            }
-            else if (buf.type == USER_MESSAGE)
-            {
-                char *ptr;
-                strcpy(ptr, buf.message);
-                if (strlen(ptr) > MAX_NAME_SIZE)
-                {
-                    strcpy(buf.message, "이름은 20글자까지입니다.");
-                    send_message(buf, SYSTEM_MESSAGE, i);
-                }
-                for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
-                {
-                    if (!strcmp(member_list[room_mafia[room_pos].member_list[j]].name, ptr))
-                    {
-                        member_list[i].skill_target = j;
-                        member_list[i].skill = use;
-                    }
-                }
-            }
         }
-    }
-    */
-        //발생할 수 없는 에러지만 에러처리함
         error_message("에러가 발생했습니다.");
         end_mafia_game(room_mafia[room_pos].to_main_pipe[0], room_pos, reads);
     }
@@ -632,7 +591,7 @@ void result_vote(int room_pos)
     { //투표가 끝날때 까지 나간사람이 없는 경우
         for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
         {
-            if (room_mafia[room_pos].member_list[j] != EMPTY && member_list[room_mafia[room_pos].member_list[j]].live == alive) 
+            if (room_mafia[room_pos].member_list[j] != EMPTY && member_list[room_mafia[room_pos].member_list[j]].live == alive)
             { //나간 사람이 아닐때 살아 있을 때만 그 소켓을 읽어야한다.
                 if (most_votes < member_list[room_mafia[room_pos].member_list[j]].vote_num)
                 {
@@ -664,22 +623,26 @@ void result_vote(int room_pos)
                 }
             }
             strcat(buf.message, "입니다.");
-            mafia_send_message(buf,SYSTEM_MESSAGE,room_pos);
+            mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
         }
-        else{
+        else
+        {
             member_list[most_voted_index].live = dead;
-            strcpy(buf.message,member_list[most_voted_index].name);
-            strcat(buf.message,"님이 투표로 죽었습니다.");
-            mafia_send_message(buf,SYSTEM_MESSAGE,room_pos);
+            strcpy(buf.message, member_list[most_voted_index].name);
+            strcat(buf.message, "님이 투표로 죽었습니다.");
+            mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
         }
     }
     for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
     {
         if (room_mafia[room_pos].member_list[j] != EMPTY && member_list[room_mafia[room_pos].member_list[j]].live == alive)
-        {   //EMPTY는 나갔다는 뜻이다.
+        {                                                                   //EMPTY는 나갔다는 뜻이다.
             member_list[room_mafia[room_pos].member_list[j]].vote_num = 0;  //투표초기화
-            member_list[room_mafia[room_pos].member_list[j]].skill = unuse;     //능력을 안썼따.
-            member_list[room_mafia[room_pos].member_list[j]].skill_target = FALSE;
+            member_list[room_mafia[room_pos].member_list[j]].skill = unuse; //능력을 안썼따.
+            if (member_list[room_mafia[room_pos].member_list[j]].job != soldier)
+            {
+                member_list[room_mafia[room_pos].member_list[j]].skill_target = FALSE;
+            }
         }
     }
     //세팅을 초기화해야한다.
@@ -689,58 +652,64 @@ void result_night(int room_pos)
 { //능력에 따라서 화면에 출력하고 죽일지 살릴지 설정하는 함수
     //마피아, 경찰 능력 사용
     member buf;
+    char mafia_target = EMPTY;
+    char docter_target = EMPTY;
     for (int i = 0; i < room_mafia[room_pos].mem_number; i++)
     {
-        int job = member_list[room_mafia[room_pos].member_list[i]].job;                                  // 스킬 사용자의 직업
-        int target_job = member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].job; // 타겟의 직업
-        if (job == mafia)
-        { // 마피아가 타겟을 암살
-            member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].live = FALSE;
-        }
-        //경찰은 능력을 써서 지목한 타겟이 마피아인지 아닌지 여부를 알릴 수 있음
-        else if (job == police)
+        if (room_mafia[room_pos].member_list[i] != EMPTY) //안나간지만 하면됨 지금부터 죽일거니까
         {
-            if (target_job == mafia)
+            jobs job = member_list[room_mafia[room_pos].member_list[i]].job; // 스킬 사용자의 직업
+            if (job == mafia)
             {
-                strcpy(buf.message, member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].name);
-                strcat(buf.message, "님은 마피아입니다.");
+                mafia_target = member_list[room_mafia[room_pos].member_list[i]].skill_target; // 타겟의 직업
+            }
+            else if (job == docter)
+            {
+                docter_target = member_list[room_mafia[room_pos].member_list[i]].skill_target;
+            }
+        }
+    }
+    for (int i = 0; i < room_mafia[room_pos].mem_number; i++)
+    {
+        if (room_mafia[room_pos].member_list[i] != EMPTY && mafia_target == room_mafia[room_pos].member_list[i])
+        { //나머지는 굳이 할필요없음 마피아 타겟일때만 하면 된다.
+            //나간사람이 아니여야하고 마피아의 타겟이여야한다.
+            if (docter_target == mafia_target)
+            { //의사에 의해 산다.
+                strcpy(buf.message, "<");
+                strcat(buf.message, member_list[mafia_target].name);
+                strcat(buf.message, ">님이 의사에 치료를 받고 살았습니다.");
                 mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
+                break;
+            }
+            else if (member_list[mafia_target].job == soldier && member_list[mafia_target].skill_target == EMPTY)
+            {
+                member_list[mafia_target].skill_target == FULL; //능력을 사용함
+                strcpy(buf.message, "<");
+                strcat(buf.message, member_list[mafia_target].name);
+                strcat(buf.message, ">님이 복문신조 정신으로 살았습니다.");
+                mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
+                break;
             }
             else
             {
-                strcpy(buf.message, member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].name);
-                strcat(buf.message, "님은 마피아가 아닙니다.");
-                mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
+                member_list[mafia_target].live = dead;
+                break;
             }
         }
     }
-    //의사는 능력을 써서 타겟을 치료
-    for (int i = 0; i < room_mafia[room_pos].mem_number; i++)
-    {
-        int job = member_list[room_mafia[room_pos].member_list[i]].job;
-        if (job == docter)
-        {
-            member_list[member_list[room_mafia[room_pos].member_list[i]].skill_target].live = TRUE;
-        }
-    }
-    // 타겟이 군인일 경우 군인은 능력을 써서 1번 살아남을 수 있음
-    for (int i = 0; i < room_mafia[room_pos].mem_number; i++)
-    {
-        int job = member_list[room_mafia[room_pos].member_list[i]].job;
-        if (job == soldier && member_list[room_mafia[room_pos].member_list[i]].live == FALSE)
-        {
-            member_list[room_mafia[room_pos].member_list[i]].live = TRUE;
-            member_list[room_mafia[room_pos].member_list[i]].skill = use;
-        }
-    }
 
-    for(int j = 0 ; j < room_mafia[room_pos].mem_number ; j++){
-        if(member_list[room_mafia[room_pos].member_list[j]].valid==TRUE && member_list[room_mafia[room_pos].member_list[j]].live==alive){
+    for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
+    {
+        if (room_mafia[room_pos].member_list[j] != EMPTY && member_list[room_mafia[room_pos].member_list[j]].live == alive)
+        {
             member_list[room_mafia[room_pos].member_list[j]].skill = unuse;
-            member_list[room_mafia[room_pos].member_list[j]].skill_target = FALSE;
+            if (member_list[room_mafia[room_pos].member_list[j]].job != soldier)
+            {
+                member_list[room_mafia[room_pos].member_list[j]].skill_target = FALSE;
+            }
         }
-    }
-    //세팅을 초기화해야한다.
+    } //세팅을 초기화해야한다.
 }
 
 void change_day(int i, member buf, fd_set *reads)
@@ -772,7 +741,7 @@ void change_day(int i, member buf, fd_set *reads)
         //디버깅용
         //printf("--------change day2----");
         result_night(room_pos);
-        room_mafia[room_pos].out_member = FALSE;    //나간사람이 없다고 다시 초기화 시킨다.
+        room_mafia[room_pos].out_member = FALSE; //나간사람이 없다고 다시 초기화 시킨다.
         mafia_number(buf.room, &room_mafia[room_pos].mafia_number, &room_mafia[room_pos].citizen_number);
         buf.mafia_num = room_mafia[room_pos].mafia_number;
         buf.citizen_num = room_mafia[room_pos].citizen_number;
@@ -789,15 +758,15 @@ void change_day(int i, member buf, fd_set *reads)
         printf("to_child_pipe[1] : <%d>\n",room_mafia[room_pos].to_child_pipe[1]);
         printf("from_cilhd_pipe[0] : <%d>\n",room_mafia[room_pos].to_main_pipe[0]);
         */
-        room_mafia[room_pos].out_member = FALSE;    //나간사람이 없다고 다시 초기화 시킨다.
+        room_mafia[room_pos].out_member = FALSE; //나간사람이 없다고 다시 초기화 시킨다.
         mafia_number(buf.room, &room_mafia[room_pos].mafia_number, &room_mafia[room_pos].citizen_number);
         buf.mafia_num = room_mafia[room_pos].mafia_number;
         buf.citizen_num = room_mafia[room_pos].citizen_number;
         send_message(buf, SYSTEM_MESSAGE, room_mafia[room_pos].to_child_pipe[1]); //보내는건 1번으로
         strcpy(buf.message, "투표를 시작합니다.");
         mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
-        strcpy(buf.message,"생존자 리스트");
-        mafia_send_message(buf,SYSTEM_MESSAGE,room_pos);
+        strcpy(buf.message, "생존자 리스트");
+        mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
         strcpy(buf.message, "< ");
         for (int j = 0; j < room_mafia[room_pos].mem_number; j++)
         {
@@ -808,16 +777,15 @@ void change_day(int i, member buf, fd_set *reads)
             }
         }
         strcat(buf.message, ">입니다. /이름 으로 투표해주세요.");
-        mafia_send_message(buf,SYSTEM_MESSAGE,room_pos);
-        
+        mafia_send_message(buf, SYSTEM_MESSAGE, room_pos);
     }
     else if (!strcmp(buf.message, "night"))
-    {   //밤으로 바꾸어라
+    { //밤으로 바꾸어라
         room_mafia[room_pos].day = night;
         //send_message(buf,SYSTEM_MESSAGE,i);
         //printf("--------change day3----");
         result_vote(room_pos);
-        room_mafia[room_pos].out_member = FALSE;    //나간사람이 없다고 다시 초기화 시킨다.
+        room_mafia[room_pos].out_member = FALSE; //나간사람이 없다고 다시 초기화 시킨다.
         mafia_number(buf.room, &room_mafia[room_pos].mafia_number, &room_mafia[room_pos].citizen_number);
         buf.mafia_num = room_mafia[room_pos].mafia_number;
         buf.citizen_num = room_mafia[room_pos].citizen_number;
@@ -864,11 +832,11 @@ void end_mafia_game(int i, int room_pos, fd_set *reads)
         member_list[room_mafia[room_pos].to_child_pipe[1]].type = NO_PIPE;
         printf("파이프 [%d]를 해제합니다.\n", room_mafia[room_pos].to_child_pipe[1]);
     }
-    printf("파이프를 전부 해제했습니다.\n");
+    //printf("파이프를 전부 해제했습니다.\n");
     int mem_num = room_mafia[room_pos].mem_number;
     for (int j = 0; j < mem_num; j++)
     {
-        if (member_list[room_mafia[room_pos].member_list[j]].valid == TRUE)
+        if (room_mafia[room_pos].member_list[j] != EMPTY)
         {                                                                  //멤버상황을 리셋해주는 것
             member_list[room_mafia[room_pos].member_list[j]].play = FALSE; //다시 false로 해준다.
         }
@@ -888,7 +856,7 @@ int mafia_number(int room_pos, int *mafia_num, int *live_num)
     for (int i = 0; i < mem_number; i++)
     {
         if (room_mafia[room_pos].member_list[i] != EMPTY && member_list[room_mafia[room_pos].member_list[i]].live == alive) //나갔는지 확인
-        {                                                                                                                                    //안나갔고 살아있을때만 인원으로 세야한다.
+        {                                                                                                                   //안나갔고 살아있을때만 인원으로 세야한다.
             if (member_list[room_mafia[room_pos].member_list[i]].job == mafia)
             {
                 (*mafia_num)++;
@@ -1071,10 +1039,11 @@ int initial_game(int mem_number, int room_pos) //방초기화 과정
     //섞었다.
     for (int i = 0; i < mem_number; i++)
     {
-        member_list[room_mafia[room_pos].member_list[i]].play = TRUE;   //게임진행중 초기화
-        member_list[room_mafia[room_pos].member_list[i]].job = job[i];  //직업설정
-        member_list[room_mafia[room_pos].member_list[i]].skill = unuse; //능력도 다 초기화 해준다.
-        member_list[room_mafia[room_pos].member_list[i]].live = alive;  //아직 살아있음을 해줌
+        member_list[room_mafia[room_pos].member_list[i]].play = TRUE;          //게임진행중 초기화
+        member_list[room_mafia[room_pos].member_list[i]].job = job[i];         //직업설정
+        member_list[room_mafia[room_pos].member_list[i]].skill = unuse;        //능력도 다 초기화 해준다.
+        member_list[room_mafia[room_pos].member_list[i]].skill_target = EMPTY; //능력도 다 초기화 해준다.
+        member_list[room_mafia[room_pos].member_list[i]].live = alive;         //아직 살아있음을 해줌
     }
     //free(job);
     return 0;
@@ -1235,8 +1204,8 @@ void mafia_send_message(member buf, char type, int room_pos)
     int mem_num = room_mafia[room_pos].mem_number;
     for (int i = 0; i < mem_num; i++)
     {
-        if (room_mafia[room_pos].member_list[i] != EMPTY)      //나간 사람이 아니면
-        { //타당한 유저면 다 보낸다.
+        if (room_mafia[room_pos].member_list[i] != EMPTY) //나간 사람이 아니면
+        {                                                 //타당한 유저면 다 보낸다.
             send_message(buf, type, room_mafia[room_pos].member_list[i]);
         }
     }
@@ -1263,16 +1232,18 @@ void out_room(member buf, fd_set *reads, int i, int fd_max)
     strcpy(buf.message, "다음에 뵐게요!");
     send_message(buf, SYSTEM_MESSAGE, i);
 
-    if (member_list[i].play == TRUE)        //게임 도중에 나간경우
+    if (member_list[i].play == TRUE) //게임 도중에 나간경우
     {
         for (int j = 0; j < room_max; j++)
         {
             if (room_mafia[j].room_number == room)
-            {                                     //같은 방을 찾는다.
-                room_mafia[j].out_member == TRUE; //나간사람이 있다고 알려준다.   나중에 투표시 사용할 것임
-                for(int k = 0 ; k < room_mafia[j].mem_number ; k++){
-                    if(room_mafia[j].member_list[k] == i){      //나간 사람이라고 EMPTY처리해준다.
-                        room_mafia[j].member_list[j] = EMPTY;
+            {                                    //같은 방을 찾는다.
+                room_mafia[j].out_member = TRUE; //나간사람이 있다고 알려준다.   나중에 투표시 사용할 것임
+                for (int k = 0; k < room_mafia[j].mem_number; k++)
+                {
+                    if (room_mafia[j].member_list[k] == i)
+                    { //나간 사람이라고 EMPTY처리해준다.
+                        room_mafia[j].member_list[k] = EMPTY;
                         break;
                     }
                 }
