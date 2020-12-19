@@ -171,6 +171,10 @@ void read_routine(int sock)
 		if ((read_buf(sock)) == -1) {
 			break;
 		}
+		/*
+		if((read_buf(sock))==0){		//상대측이 소켓을 닫았을 때 종료함을 말함
+			break;
+		}*/
 		//printf("buf_type : %c ",buf.type);
 		//buf.type은 세종류가 있고 이는 서버에서 데이터를 보낼때 결정합니다.
 		switch (buf.type) {
