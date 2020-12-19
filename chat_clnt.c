@@ -45,6 +45,7 @@ gcc filename.c -lncursesw -lpthread -lcurses -o filename
 #define USER_MESSAGE '2'
 #define WHISPER_MESSAGE '3'
 #define MAFIA_MESSAGE '4'
+#define MAFIA_END_MESSAGE '5'
 
 #define SYSTEM_COLOR 1
 #define WHISPER_COLOR 3
@@ -119,6 +120,11 @@ int main(int argc, char * argv[])
 	win_msg_scroll = newwin(LINES - 10, COLS - 8, 1, 2);
 	win_write = newwin(5, COLS - 2, LINES - 8, 0);
 	win_input_str = newwin(1, COLS - 6, LINES - 6, 2);
+
+	keypad(win_read, TRUE);
+	keypad(win_msg_scroll, TRUE);
+	keypad(win_write, TRUE);
+	keypad(win_input_str, TRUE);
 
 	scrollok(win_msg_scroll, TRUE);
 	box(win_read, 0, 0);
@@ -200,7 +206,7 @@ void read_routine(void *socket)
 			wprintw(win_msg_scroll, "[%s] : /w %s\n", buf.name, buf.message);
 			wattroff(win_msg_scroll, COLOR_PAIR(WHISPER_COLOR));
 			break;
-		case MAFIA_MESSAGE:
+		case MAFIA_MESSAGE: case MAFIA_END_MESSAGE :
 			wclear(win_msg_scroll);
 			wattron(win_msg_scroll, COLOR_PAIR(SYSTEM_COLOR));
 			wprintw(win_msg_scroll, "< 시스템 알림 > : /w %s\n", buf.message);
@@ -229,26 +235,29 @@ void write_routine(void *socket)
 	{
 		wgetstr(win_input_str, temp);
 		strncpy(buf.message, temp, BUF_SIZE);
-		if (buf.message[0] == '/') {	//   '/'로 시작할시 특수 이벤트를 넣기 위해 분리했습니다. 아이디어 주시면 감사합니다.
-			buf.type = SYSTEM_MESSAGE;
-			if (!strcmp(buf.message, "/end")) {	//이 if문은 연결을 닫는 코드로 크게 신경 안쓰셔도 됩니다.
+
+		if (strlen(buf.message) > 0) {
+			if (buf.message[0] == '/') {	//   '/'로 시작할시 특수 이벤트를 넣기 위해 분리했습니다. 아이디어 주시면 감사합니다.
+				buf.type = SYSTEM_MESSAGE;
+				if (!strcmp(buf.message, "/end")) {	//이 if문은 연결을 닫는 코드로 크게 신경 안쓰셔도 됩니다.
+					write(sock, (char*)&buf, sizeof(member));
+
+					getch();							//여기서 window 삭제 -> main에서도 삭제?
+					delwin(win_msg_scroll);
+					delwin(win_read);
+					delwin(win_write);
+					delwin(win_input_str);
+					endwin();
+
+					shutdown(sock, SHUT_WR);
+				}
 				write(sock, (char*)&buf, sizeof(member));
-
-				getch();							//여기서 window 삭제 -> main에서도 삭제?
-				delwin(win_msg_scroll);
-				delwin(win_read);
-				delwin(win_write);
-				delwin(win_input_str);
-				endwin();
-
-				shutdown(sock, SHUT_WR);
 			}
-			write(sock, (char*)&buf, sizeof(member));
-		}
-		else {
-			//이부분은 일반 채팅 부분입니다.
-			buf.type = USER_MESSAGE;
-			write(sock, (char*)&buf, sizeof(member));
+			else {
+				//이부분은 일반 채팅 부분입니다.
+				buf.type = USER_MESSAGE;
+				write(sock, (char*)&buf, sizeof(member));
+			}
 		}
 
 		//입력 후 입력창 비움
